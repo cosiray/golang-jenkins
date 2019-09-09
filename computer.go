@@ -9,7 +9,6 @@ type ComputerObject struct {
 
 type Computer struct {
 	Actions             []struct{} `json:"actions"`
-	Class               string     `json:"_class"`
 	DisplayName         string     `json:"displayName"`
 	Executors           []struct{} `json:"executors"`
 	Idle                bool       `json:"idle"`

@@ -71,7 +71,6 @@ type Job struct {
 	Color   string   `json:"color"`
 
 	Buildable    bool     `json:"buildable"`
-	Builds       []Build  `json:"builds"`
 	DisplayName  string   `json:"displayName"`
 	Description  string   `json:"description"`
 	HealthReport []Health `json:"healthReport"`
@@ -82,28 +81,13 @@ type Job struct {
 	LastSuccessfulBuild   Build `json:"lastSuccessfulBuild"`
 	LastUnstableBuild     Build `json:"lastUnstableBuild"`
 	LastUnsuccessfulBuild Build `json:"lastUnsuccessfulBuild"`
-
-	Property []Property `json:"property"`
 }
 
 type Health struct {
 	Description string `json:"description"`
 }
 
-type Property struct {
-	Parameters []JobParameter `json:"parameterDefinitions"`
-}
-
-type JobParameter struct {
-	Default     Parameter `json:"defaultParameterValue"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Type        string    `json:"type"`
-	Choices     []string  `json:"choices"`
-}
-
-type MavenJobItem struct {
-	XMLName                          struct{}             `xml:"maven2-moduleset"`
+type FreeJobItem struct {
 	Plugin                           string               `xml:"plugin,attr"`
 	Actions                          string               `xml:"actions"`
 	Description                      string               `xml:"description"`
@@ -136,8 +120,60 @@ type MavenJobItem struct {
 	Postbuilders                     PostBuilders         `xml:"postbuilders"`
 }
 
+type MavenJobItem struct {
+	XMLName                          struct{}             `xml:"maven2-moduleset"`
+	Plugin                           string               `xml:"plugin,attr"`
+	Actions                          string               `xml:"actions"`
+	Description                      string               `xml:"description"`
+	KeepDependencies                 string               `xml:"keepDependencies"`
+	Properties                       JobProperties        `xml:"properties"`
+	Scm                              Scm                  `xml:"scm"`
+	CanRoam                          string               `xml:"canRoam"`
+	Disabled                         string               `xml:"disabled"`
+	BlockBuildWhenDownstreamBuilding string               `xml:"blockBuildWhenDownstreamBuilding"`
+	BlockBuildWhenUpstreamBuilding   string               `xml:"blockBuildWhenUpstreamBuilding"`
+	Triggers                         Triggers             `xml:"triggers"`
+	ConcurrentBuild                  string               `xml:"concurrentBuild"`
+	Goals                            string               `xml:"goals"`
+	RootPOM				 string		      `xml:"rootPOM"`
+	AggregatorStyleBuild             string               `xml:"aggregatorStyleBuild"`
+	IncrementalBuild                 string               `xml:"incrementalBuild"`
+	IgnoreUpstremChanges             string               `xml:"ignoreUpstremChanges"`
+	ArchivingDisabled                string               `xml:"archivingDisabled"`
+	SiteArchivingDisabled            string               `xml:"siteArchivingDisabled"`
+	FingerprintingDisabled           string               `xml:"fingerprintingDisabled"`
+	ResolveDependencies              string               `xml:"resolveDependencies"`
+	ProcessPlugins                   string               `xml:"processPlugins"`
+	MavenName                        string               `xml:"mavenName"`
+	MavenValidationLevel             string               `xml:"mavenValidationLevel"`
+	DefaultGoals                     string               `xml:"defaultGoals"`
+	RunHeadless                      string               `xml:"runHeadless"`
+	DisableTriggerDownstreamProjects string               `xml:"disableTriggerDownstreamProjects"`
+	Settings                         JobSettings          `xml:"settings"`
+	GlobalSettings                   JobSettings          `xml:"globalSettings"`
+	RunPostStepsIfResult             RunPostStepsIfResult `xml:"runPostStepsIfResult"`
+	Postbuilders                     PostBuilders         `xml:"postbuilders"`
+}
+
+type GitUserRemoteConfig struct {
+	Url           string `xml:"url"`
+	CredentialsId string `xml:"credentialsId"`
+}
+
 type Scm struct {
-	ScmContent
+	ConfigVersion string `xml:"configVersion"`
+	SubmoduleCfg struct {
+		Class string `xml:"class,attr"`
+	} `xml:"submoduleCfg"`
+	DoGenerateSubmoduleConfigurations string `xml:"doGenerateSubmoduleConfigurations"`
+	UserRemoteConfigs struct {
+		GitUserRemoteConfig GitUserRemoteConfig `xml:"hudson.plugins.git.UserRemoteConfig"`
+	} `xml:"userRemoteConfigs"`
+	Branches struct {
+		BranchSpec struct {
+			Name string `xml:"name"`
+		} `xml:"hudson.plugins.git.BranchSpec"`
+	} `xml:"branches"`
 	Class  string `xml:"class,attr"`
 	Plugin string `xml:"plugin,attr"`
 }
@@ -190,7 +226,7 @@ type JobSettings struct {
 
 type JobSetting struct {
 }
-type JobProperties struct {
+type JobProperties interface {
 }
 type Triggers struct {
 	Trigger []Trigger
@@ -255,27 +291,28 @@ type LocalBranch struct {
 
 //UnmarshalXML implements xml.UnmarshalXML intrface
 //Decode between multiple types of Scm. for now only SVN is supported
-func (iscm *Scm) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	for _, v := range start.Attr {
-		if v.Name.Local == "class" {
-			iscm.Class = v.Value
-		} else if v.Name.Local == "plugin" {
-			iscm.Plugin = v.Value
-		}
-	}
-	switch iscm.Class {
-	case "hudson.scm.SubversionSCM":
-		iscm.ScmContent = &ScmSvn{}
-		err := d.DecodeElement(&iscm.ScmContent, &start)
-		if err != nil {
-			return err
-		}
-	case "hudson.plugins.git.GitSCM":
-		iscm.ScmContent = &ScmGit{}
-		err := d.DecodeElement(&iscm.ScmContent, &start)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
+//func (iscm *Scm) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+//	for _, v := range start.Attr {
+//		if v.Name.Local == "class" {
+//			iscm.Class = v.Value
+//		} else if v.Name.Local == "plugin" {
+//			iscm.Plugin = v.Value
+//		}
+//	}
+//	switch iscm.Class {
+//	case "hudson.scm.SubversionSCM":
+//		iscm.ScmContent = &ScmSvn{}
+//		err := d.DecodeElement(&iscm.ScmContent, &start)
+//		if err != nil {
+//			return err
+//		}
+//	case "hudson.plugins.git.GitSCM":
+//		iscm.ScmContent = &ScmGit{}
+//		err := d.DecodeElement(&iscm.ScmContent, &start)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
+

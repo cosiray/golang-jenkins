@@ -131,6 +131,10 @@ func (jenkins *Jenkins) get(path string, params url.Values, body interface{}) (e
 	if err != nil {
 		return
 	}
+	if !(200 <= resp.StatusCode && resp.StatusCode <= 299) {
+		return errors.New(fmt.Sprintf("error: HTTP GET returned status code %d (expected 2xx)", resp.StatusCode))
+	}
+
 	return jenkins.parseResponse(resp, body)
 }
 
@@ -232,12 +236,56 @@ func (jenkins *Jenkins) GetLastBuild(job Job) (build Build, err error) {
 	return
 }
 
+type MyError struct {
+	StrErr string
+}
+
+func (e *MyError) Error() string {
+	return e.StrErr
+}
+
+// GetBuildHistory returns []builds
+func (jenkins *Jenkins) GetBuildHistory(name string) (build []*Build, err error) {
+	requestUrl := jenkins.baseUrl + "/job/" + name + "/api/json?tree=builds[id,number,url,fullDisplayName,description,timestamp,duration,estimatedDuration,building,keepLog,result,artifacts,actions,changeSet]"
+	req, err := http.NewRequest("GET", requestUrl, nil)
+	if err != nil {
+		return
+	}
+	resp, err := jenkins.sendRequest(req)
+	if resp.StatusCode != 200 {
+		err = &MyError{resp.Status}
+		return
+	}
+	if err != nil {
+		return
+	}
+
+	type BodyStruct struct {
+		Class  string   `json:"_class"`
+		Builds []*Build `json:"builds"`
+	}
+	body := new(BodyStruct)
+	err = jenkins.parseResponse(resp, &body)
+	if err != nil {
+		return
+	}
+	build = body.Builds
+	return
+}
+
 // Create a new job
 func (jenkins *Jenkins) CreateJob(mavenJobItem MavenJobItem, jobName string) error {
 	mavenJobItemXml, _ := xml.Marshal(mavenJobItem)
 	reader := bytes.NewReader(mavenJobItemXml)
 	params := url.Values{"name": []string{jobName}}
 
+	return jenkins.postXml("/createItem", params, reader, nil)
+}
+
+// create freestyle job
+func (jenkins *Jenkins) CreateFreeJob(jobName string, freeJobItem []byte) error {
+	reader := bytes.NewReader(freeJobItem)
+	params := url.Values{"name": []string{jobName}}
 	return jenkins.postXml("/createItem", params, reader, nil)
 }
 
@@ -259,6 +307,11 @@ func (jenkins *Jenkins) CreateView(listView ListView) error {
 	params := url.Values{"name": []string{listView.Name}}
 
 	return jenkins.postXml("/createView", params, reader, nil)
+}
+
+// stop jenkins build
+func (jenkins *Jenkins) AbortJob(name string, buildId int) error {
+	return jenkins.post(fmt.Sprintf("job/%s/%d/stop", name, buildId), nil, nil)
 }
 
 // Create a new build for this job.
